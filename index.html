@@ -2,42 +2,53 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Outspell</title>
   </head>
   <body>
     <main id="app">
-      <section class="board-area">
-        <div id="board" class="board" role="grid" aria-label="Game board"></div>
-      </section>
-
-      <aside class="panel">
-        <header class="title">
-          <h1>Outspell</h1>
-          <button id="bag" class="bag-button" data-popover="bag" aria-haspopup="dialog"></button>
-        </header>
-
+      <header class="topbar">
+        <h1>Outspell</h1>
         <div class="scores">
           <div class="score" id="score-you"><span class="label">You</span><span class="value">0</span></div>
           <div class="score" id="score-ai"><span class="label">AI</span><span class="value">0</span></div>
         </div>
+        <button id="bag" class="bag-button" data-popover="bag" aria-haspopup="dialog"></button>
+        <button id="zoom" class="icon-button compact-only" aria-label="Zoom board" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /><path d="M7.5 10.5h6" /><path class="zoom-vertical" d="M10.5 7.5v6" /></svg>
+        </button>
+        <button id="menu" class="icon-button compact-only" aria-label="Moves" aria-expanded="false" aria-controls="moves">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        </button>
+      </header>
 
+      <section class="board-area">
+        <div id="board-viewport" class="board-viewport">
+          <div id="board" class="board" role="grid" aria-label="Game board"></div>
+        </div>
+      </section>
+
+      <section class="dock">
         <p id="status" class="status" aria-live="polite">Loading dictionary…</p>
-
         <div id="rack" class="rack" aria-label="Your rack"></div>
-
-        <div class="actions" id="actions">
-          <button id="play" class="primary" disabled>Play</button>
+        <div class="actions">
           <button id="recall" disabled>Recall</button>
           <button id="shuffle" disabled>Shuffle</button>
           <button id="swap" disabled>Swap</button>
           <button id="pass" disabled>Pass</button>
+          <button id="play" class="primary" disabled>Play</button>
         </div>
+      </section>
 
-        <h2>Moves</h2>
+      <section id="moves" class="moves" aria-label="Moves">
+        <div class="moves-header">
+          <h2>Moves</h2>
+          <button id="new-game" class="text-button">New game</button>
+        </div>
         <ol id="log" class="log" reversed></ol>
-      </aside>
+      </section>
     </main>
+    <div id="sheet-backdrop" class="sheet-backdrop"></div>
 
     <dialog id="blank-picker">
       <p>Choose a letter for the blank</p>
