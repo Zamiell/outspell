@@ -114,3 +114,30 @@ test('a human play scores, refills the rack to 6 and passes the turn', () => {
   assert.equal(game.players[0].rack.length, 6);
   assert.equal(game.currentPlayer.isAI, true);
 });
+
+test('a saved game restores exactly and keeps playing', () => {
+  let seed = 42;
+  const rng = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  const game = new Game(dict, { rng });
+  for (let i = 0; i < 4 && !game.over; i++) game.playAI();
+
+  const snapshot = JSON.parse(JSON.stringify(game.toSnapshot()));
+  const restored = new Game(dict, {}, snapshot);
+  assert.deepEqual(restored.toSnapshot(), game.toSnapshot());
+  assert.equal(restored.history.length, game.history.length);
+  // History entries point at the restored game's own player objects.
+  assert.ok(restored.history.every((turn) => restored.players.includes(turn.player)));
+
+  // Both copies make the same next move.
+  if (!game.over) assert.deepEqual(restored.playAI().kind, game.playAI().kind);
+  assert.deepEqual(restored.toSnapshot().board, game.toSnapshot().board);
+});
+
+test('corrupted saves are rejected', () => {
+  const good = new Game(dict, { rng: () => 0.3 }).toSnapshot();
+  const extraTile = structuredClone(good);
+  extraTile.players[0].rack.push('Z');
+  assert.throws(() => new Game(dict, {}, extraTile), /wrong number of Z/);
+  assert.throws(() => new Game(dict, {}, { ...good, version: 2 } as never), /unknown version/);
+  assert.throws(() => new Game(dict, {}, { ...good, board: [] }), /bad board/);
+});

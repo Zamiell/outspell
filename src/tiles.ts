@@ -24,7 +24,15 @@ export function rackValue(rack: readonly string[]): number {
 export class Bag {
   private tiles: string[] = [];
 
-  constructor(private readonly rng: Rng = Math.random) {
+  /** A full, shuffled bag, or exactly `tiles` (in order) when restoring a saved game. */
+  constructor(
+    private readonly rng: Rng = Math.random,
+    tiles?: readonly string[],
+  ) {
+    if (tiles) {
+      this.tiles = [...tiles];
+      return;
+    }
     for (const [letter, count] of Object.entries(DISTRIBUTION)) {
       for (let i = 0; i < count; i++) this.tiles.push(letter);
     }
@@ -33,6 +41,10 @@ export class Bag {
 
   get size(): number {
     return this.tiles.length;
+  }
+
+  get contents(): string[] {
+    return [...this.tiles];
   }
 
   draw(n: number): string[] {

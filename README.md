@@ -25,6 +25,8 @@ A browser Scrabble game: you against a greedy AI.
 - **Tap "N in bag"** to see the unseen tiles. These are the bag plus the AI's rack combined, since you can't tell which is which.
 - **Tap any word in the move list** (or hover with a mouse) for its definition, from [Wiktionary](https://en.wiktionary.org).
 
+**Your game is saved** in the browser after every move, so refreshing or closing the page doesn't lose it. Tiles you've placed but not played go back to your rack. Saves are per browser and device.
+
 **On phones** the whole game fits on one screen. The board zooms in when you start placing tiles and zooms back out when you play; the magnifier button toggles it. The move list is behind the ☰ button.
 
 ## Development

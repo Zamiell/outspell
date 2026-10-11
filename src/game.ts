@@ -1,8 +1,8 @@
 import { findBestMove } from './ai.ts';
-import { type Board, createBoard } from './board.ts';
+import { type Board, BOARD_SIZE, createBoard } from './board.ts';
 import type { Dictionary } from './dictionary.ts';
 import { type Placement, type ScoredMove, evaluateMove } from './rules.ts';
-import { BLANK, Bag, type Rng, rackValue } from './tiles.ts';
+import { ALPHABET, BLANK, Bag, DISTRIBUTION, type Rng, rackValue } from './tiles.ts';
 
 export const HUMAN_RACK_SIZE = 6;
 export const AI_RACK_SIZE = 7;
@@ -24,6 +24,24 @@ export type Turn =
   | { kind: 'exchange'; player: Player; count: number }
   | { kind: 'pass'; player: Player };
 
+/** A turn as saved: the player is stored by index. */
+export type SavedTurn =
+  | { kind: 'play'; player: number; move: ScoredMove }
+  | { kind: 'exchange'; player: number; count: number }
+  | { kind: 'pass'; player: number };
+
+/** Plain-JSON form of a game, for saving it and restoring it later. */
+export interface GameSnapshot {
+  version: 1;
+  board: Board;
+  bag: string[];
+  players: { rack: string[]; score: number; rackSize: number }[];
+  current: number;
+  over: boolean;
+  scorelessTurns: number;
+  history: SavedTurn[];
+}
+
 export interface GameOptions {
   humanRackSize?: number;
   aiRackSize?: number;
@@ -31,7 +49,7 @@ export interface GameOptions {
 }
 
 export class Game {
-  readonly board: Board = createBoard();
+  readonly board: Board;
   readonly bag: Bag;
   readonly players: Player[];
   current = 0;
@@ -39,17 +57,44 @@ export class Game {
   history: Turn[] = [];
   private scorelessTurns = 0;
 
+  /** Starts a new game, or resumes `snapshot` (throws if the snapshot isn't a valid game). */
   constructor(
     readonly dict: Dictionary,
     { humanRackSize = HUMAN_RACK_SIZE, aiRackSize = AI_RACK_SIZE, rng = Math.random }: GameOptions = {},
+    snapshot?: GameSnapshot,
   ) {
-    this.bag = new Bag(rng);
     this.players = [
       { name: 'You', isAI: false, rackSize: humanRackSize, rack: [], score: 0 },
       { name: 'AI', isAI: true, rackSize: aiRackSize, rack: [], score: 0 },
     ];
+    if (snapshot) {
+      validateSnapshot(snapshot);
+      this.board = snapshot.board.map((row) => row.map((tile) => (tile ? { ...tile } : null)));
+      this.bag = new Bag(rng, snapshot.bag);
+      snapshot.players.forEach((saved, i) => Object.assign(this.players[i], { ...saved, rack: [...saved.rack] }));
+      this.current = snapshot.current;
+      this.over = snapshot.over;
+      this.scorelessTurns = snapshot.scorelessTurns;
+      this.history = snapshot.history.map((turn) => ({ ...turn, player: this.players[turn.player] }));
+      return;
+    }
+    this.board = createBoard();
+    this.bag = new Bag(rng);
     for (const p of this.players) p.rack = this.bag.draw(p.rackSize);
     this.current = rng() < 0.5 ? 0 : 1;
+  }
+
+  toSnapshot(): GameSnapshot {
+    return {
+      version: 1,
+      board: this.board.map((row) => row.map((tile) => (tile ? { ...tile } : null))),
+      bag: this.bag.contents,
+      players: this.players.map(({ rack, score, rackSize }) => ({ rack: [...rack], score, rackSize })),
+      current: this.current,
+      over: this.over,
+      scorelessTurns: this.scorelessTurns,
+      history: this.history.map((turn) => ({ ...turn, player: this.players.indexOf(turn.player) })),
+    };
   }
 
   get currentPlayer(): Player {
@@ -129,4 +174,39 @@ export function removeTiles(rack: readonly string[], tiles: readonly string[]): 
     remaining.splice(i, 1);
   }
   return remaining;
+}
+
+/** Rejects anything that isn't a coherent game: wrong shape, or tiles that don't add up to one full set. */
+function validateSnapshot(snap: GameSnapshot): void {
+  const fail = (why: string): never => {
+    throw new Error(`Invalid saved game: ${why}`);
+  };
+  if (snap?.version !== 1) fail('unknown version');
+  if (!Array.isArray(snap.board) || snap.board.length !== BOARD_SIZE || snap.board.some((r) => !Array.isArray(r) || r.length !== BOARD_SIZE)) {
+    fail('bad board');
+  }
+  if (!Array.isArray(snap.players) || snap.players.length !== 2) fail('bad players');
+  if (![0, 1].includes(snap.current)) fail('bad current player');
+  if (!Array.isArray(snap.history) || snap.history.some((t) => ![0, 1].includes(t?.player))) fail('bad history');
+
+  const counts = new Map<string, number>();
+  const count = (t: unknown) => {
+    if (typeof t !== 'string' || !(t in DISTRIBUTION)) fail('unknown tile');
+    counts.set(t as string, (counts.get(t as string) ?? 0) + 1);
+  };
+  for (const row of snap.board) {
+    for (const tile of row) {
+      if (!tile) continue;
+      if (!ALPHABET.includes(tile.letter) || tile.letter.length !== 1) fail('bad board tile');
+      count(tile.blank ? BLANK : tile.letter);
+    }
+  }
+  snap.bag.forEach(count);
+  for (const p of snap.players) {
+    if (!Array.isArray(p.rack) || !Number.isInteger(p.score) || !Number.isInteger(p.rackSize)) fail('bad player');
+    p.rack.forEach(count);
+  }
+  for (const [tile, n] of Object.entries(DISTRIBUTION)) {
+    if ((counts.get(tile) ?? 0) !== n) fail(`wrong number of ${tile} tiles`);
+  }
 }

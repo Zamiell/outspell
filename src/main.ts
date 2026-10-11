@@ -3,7 +3,7 @@ import wordsUrl from '../dictionary/enable1.txt?url';
 import { BOARD_SIZE, CENTER, PREMIUMS, cellLabel, inBounds } from './board.ts';
 import { define } from './definitions.ts';
 import { Dictionary } from './dictionary.ts';
-import { Game, MIN_BAG_FOR_EXCHANGE, type Turn } from './game.ts';
+import { Game, type GameSnapshot, MIN_BAG_FOR_EXCHANGE, type Turn } from './game.ts';
 import { setupPopovers } from './popover.ts';
 import { type Direction, type Placement, evaluateMove } from './rules.ts';
 import { ALPHABET, BLANK, DISTRIBUTION, LETTER_VALUES } from './tiles.ts';
@@ -37,6 +37,8 @@ interface Drag {
 }
 
 const AI_DELAY_MS = 600;
+/** localStorage key for the game in progress. Bump the suffix if the snapshot format changes. */
+const SAVE_KEY = 'outspell:game:v1';
 const ZOOM_FACTOR = 1.8;
 const DRAG_THRESHOLD_PX = 6;
 /** On touch, the dragged tile floats this far above the finger so you can see where it's going. */
@@ -325,6 +327,7 @@ function render(): void {
   zoomButton.setAttribute('aria-pressed', String(zoomed));
 
   popovers.refresh((id) => id === 'bag');
+  saveGame();
 }
 
 // ---------------------------------------------------------------- zoom (phones)
@@ -495,13 +498,52 @@ function showGameOver(): void {
 }
 
 function newGame(): void {
-  game = new Game(dict);
+  startGame(new Game(dict));
+}
+
+function startGame(g: Game): void {
+  game = g;
   clearPlacement();
-  lastAIMove = new Set();
+  // Re-highlight the AI's last move when resuming.
+  const last = game.history.at(-1);
+  lastAIMove = new Set(last?.kind === 'play' && last.player.isAI ? last.move.placements.map((p) => cellKey(p.row, p.col)) : []);
   loggedTurns = -1;
   setSheetOpen(false);
   setZoom(false);
   afterTurn();
+}
+
+// ---------------------------------------------------------------- saving
+
+/**
+ * Saves the game to this browser's localStorage so a refresh doesn't lose it.
+ * Tiles placed but not yet played aren't saved; they're simply back on the rack.
+ * Storage can be unavailable (private mode, blocked site data), so failures are ignored.
+ */
+function saveGame(): void {
+  try {
+    if (game.over) localStorage.removeItem(SAVE_KEY);
+    else localStorage.setItem(SAVE_KEY, JSON.stringify(game.toSnapshot()));
+  } catch {
+    // Not fatal: the game just won't survive a refresh.
+  }
+}
+
+function loadSavedGame(): Game | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const saved = new Game(dict, {}, JSON.parse(raw) as GameSnapshot);
+    return saved.over ? null : saved;
+  } catch (err) {
+    console.warn('Discarding saved game:', err);
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch {
+      // ignore
+    }
+    return null;
+  }
 }
 
 function setSheetOpen(open: boolean): void {
@@ -821,7 +863,9 @@ gameOverDialog.addEventListener('close', newGame);
 Dictionary.load(wordsUrl)
   .then((loaded) => {
     dict = loaded;
-    newGame();
+    const saved = loadSavedGame();
+    if (saved) startGame(saved);
+    else newGame();
   })
   .catch((err: Error) => {
     statusEl.textContent = err.message;
