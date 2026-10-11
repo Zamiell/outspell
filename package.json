@@ -1,7 +1,7 @@
 {
-  "name": "scrabble",
+  "name": "outspell",
   "version": "1.0.0",
-  "description": "Outspell emulator.",
+  "description": "A browser Scrabble game against a greedy AI.",
   "scripts": {
     "test": "node --import tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
@@ -18,5 +18,6 @@
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vite": "8.3.4"
-  }
+  },
+  "private": true
 }
