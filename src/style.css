@@ -205,7 +205,9 @@ h2 {
 .board {
   container-type: inline-size;
   display: grid;
-  grid-template-columns: repeat(15, 1fr);
+  /* Fixed, equal tracks both ways so square contents (like the centre star) can't stretch a row. */
+  grid-template-columns: repeat(15, minmax(0, 1fr));
+  grid-template-rows: repeat(15, minmax(0, 1fr));
   gap: 2px;
   padding: 2px;
   width: 100%;
@@ -228,8 +230,11 @@ h2 {
   border-radius: 3px;
   font-size: 1.7cqi;
   font-weight: 700;
+  line-height: 1;
   color: #fff;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   cursor: pointer;
 }
 .cell.TW { background: var(--tw); }
