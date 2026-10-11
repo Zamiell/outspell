@@ -2,6 +2,8 @@
 
 Outspell emulator: a browser Scrabble game, human vs AI.
 
+**Play it at https://zamiell.github.io/outspell/** — every push to `main` redeploys automatically.
+
 - **You get 6 tiles**; the AI gets the standard 7 (see `HUMAN_RACK_SIZE` / `AI_RACK_SIZE` in `src/game.ts`).
 - **The AI is greedy.** Each turn it generates every legal move against the full dictionary and plays the highest-scoring one. It doesn't look ahead, consider its rack leave, or play defence. If it has no move, it passes.
 - Standard board, tile distribution, letter values and 50-point bingo for using 7 tiles.
