@@ -1,5 +1,6 @@
 import './style.css';
 import wordsUrl from '../dictionary/enable1.txt?url';
+import { DIFFICULTIES, type Difficulty } from './ai.ts';
 import { BOARD_SIZE, CENTER, PREMIUMS, cellLabel, inBounds } from './board.ts';
 import { define } from './definitions.ts';
 import { Dictionary } from './dictionary.ts';
@@ -39,6 +40,9 @@ interface Drag {
 const AI_DELAY_MS = 600;
 /** localStorage key for the game in progress. Bump the suffix if the snapshot format changes. */
 const SAVE_KEY = 'outspell:game:v1';
+/** localStorage key for the last difficulty picked, offered first next time. */
+const DIFFICULTY_KEY = 'outspell:difficulty';
+const DIFFICULTY_NAMES: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 const ZOOM_FACTOR = 1.8;
 const DRAG_THRESHOLD_PX = 6;
 /** On touch, the dragged tile floats this far above the finger so you can see where it's going. */
@@ -64,7 +68,7 @@ const buttons = {
   pass: $<HTMLButtonElement>('pass'),
 };
 const blankPicker = $<HTMLDialogElement>('blank-picker');
-const gameOverDialog = $<HTMLDialogElement>('game-over');
+const newGameDialog = $<HTMLDialogElement>('new-game-dialog');
 
 let dict: Dictionary;
 let game: Game;
@@ -301,6 +305,7 @@ function render(): void {
 
   $('score-you').querySelector('.value')!.textContent = String(human().score);
   $('score-ai').querySelector('.value')!.textContent = String(ai().score);
+  $('difficulty-label').textContent = DIFFICULTY_NAMES[game.difficulty];
   $('score-you').classList.toggle('active', !game.over && !game.currentPlayer.isAI);
   $('score-ai').classList.toggle('active', !game.over && game.currentPlayer.isAI);
   bagEl.textContent = `${game.bag.size} in bag`;
@@ -492,14 +497,54 @@ function afterTurn(): void {
 function showGameOver(): void {
   const you = human().score;
   const them = ai().score;
-  $('game-over-title').textContent = you === them ? "It's a tie" : you > them ? 'You win!' : 'The AI wins';
-  $('game-over-score').textContent = `You ${you} — AI ${them}`;
-  gameOverDialog.showModal();
+  void promptNewGame({
+    title: you === them ? "It's a tie" : you > them ? 'You win!' : 'The AI wins',
+    subtitle: `You ${you} — AI ${them}. Play again?`,
+    cancellable: false,
+  });
 }
 
-function newGame(): void {
-  startGame(new Game(dict));
+/**
+ * Asks for a difficulty and starts a game with it. When `cancellable`, the
+ * current game carries on if the player backs out.
+ */
+async function promptNewGame({ title = 'New game', subtitle = 'How tough should the AI be?', cancellable = false } = {}): Promise<void> {
+  $('new-game-title').textContent = title;
+  $('new-game-subtitle').textContent = subtitle;
+  $('new-game-cancel').hidden = !cancellable;
+  const last = readStoredDifficulty();
+  for (const b of newGameDialog.querySelectorAll<HTMLButtonElement>('.difficulty-options button[value]')) {
+    b.classList.toggle('last-used', b.value === last);
+  }
+  newGameDialog.returnValue = '';
+  newGameDialog.showModal();
+  newGameDialog.querySelector<HTMLButtonElement>(`button[value="${last}"]`)?.focus();
+  const choice = await new Promise<string>((resolve) =>
+    newGameDialog.addEventListener('close', () => resolve(newGameDialog.returnValue), { once: true }),
+  );
+  if (!DIFFICULTIES.includes(choice as Difficulty)) return; // cancelled
+  try {
+    localStorage.setItem(DIFFICULTY_KEY, choice);
+  } catch {
+    // ignore: we just won't remember it
+  }
+  startGame(new Game(dict, { difficulty: choice as Difficulty }));
 }
+
+function readStoredDifficulty(): Difficulty {
+  try {
+    const stored = localStorage.getItem(DIFFICULTY_KEY) as Difficulty | null;
+    if (stored && DIFFICULTIES.includes(stored)) return stored;
+  } catch {
+    // fall through
+  }
+  return 'medium';
+}
+
+// Escape would close the dialog without a choice; only allow that when there's a game to go back to.
+newGameDialog.addEventListener('cancel', (e) => {
+  if ($('new-game-cancel').hidden) e.preventDefault();
+});
 
 function startGame(g: Game): void {
   game = g;
@@ -820,7 +865,8 @@ zoomButton.addEventListener('click', () => {
 menuButton.addEventListener('click', () => setSheetOpen(!document.body.classList.contains('sheet-open')));
 $('sheet-backdrop').addEventListener('click', () => setSheetOpen(false));
 $('new-game').addEventListener('click', () => {
-  if (confirm('Start a new game?')) newGame();
+  setSheetOpen(false);
+  void promptNewGame({ subtitle: 'This ends the current game. How tough should the AI be?', cancellable: true });
 });
 compactLayout.addEventListener('change', () => {
   setZoom(false);
@@ -856,8 +902,6 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-gameOverDialog.addEventListener('close', newGame);
-
 // ---------------------------------------------------------------- start
 
 Dictionary.load(wordsUrl)
@@ -865,7 +909,7 @@ Dictionary.load(wordsUrl)
     dict = loaded;
     const saved = loadSavedGame();
     if (saved) startGame(saved);
-    else newGame();
+    else void promptNewGame({ title: 'Welcome to Outspell', subtitle: 'Pick how tough the AI should be.' });
   })
   .catch((err: Error) => {
     statusEl.textContent = err.message;

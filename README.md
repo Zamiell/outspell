@@ -8,7 +8,10 @@ A browser Scrabble game: you against a greedy AI.
 
 - Standard 15×15 board, tile distribution and letter values.
 - **You get 6 tiles; the AI gets the standard 7.** The 50-point bingo needs all 7 tiles in one play, so only the AI can get it.
-- **The AI is greedy.** Each turn it finds every legal move against the full dictionary and plays the highest-scoring one. It doesn't look ahead, think about the tiles it keeps, or play defence. If it has no move, it passes.
+- **Pick a difficulty** at the start of each game. Every level finds every legal move against the full dictionary; none of them look ahead, think about the tiles they keep, or play defence. If the AI has no move, it passes.
+  - **Hard** always plays its highest-scoring move.
+  - **Medium** plays a move worth about 65% of its best.
+  - **Easy** plays a move worth about 35% of its best, picked at random among the moves near that score.
 - Words are checked against **ENABLE** (public domain, 172,823 words). It predates some newer words, so QI and ZA aren't valid.
 - The game ends when someone plays out with the bag empty, or after six scoreless turns in a row. Leftover tiles are scored as in standard Scrabble.
 

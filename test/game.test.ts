@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { findBestMove } from '../src/ai.ts';
+import { chooseMove, findBestMove } from '../src/ai.ts';
 import { type Board, BOARD_SIZE, createBoard } from '../src/board.ts';
 import { Dictionary } from '../src/dictionary.ts';
 import { Game, removeTiles } from '../src/game.ts';
@@ -140,4 +140,30 @@ test('corrupted saves are rejected', () => {
   assert.throws(() => new Game(dict, {}, extraTile), /wrong number of Z/);
   assert.throws(() => new Game(dict, {}, { ...good, version: 2 } as never), /unknown version/);
   assert.throws(() => new Game(dict, {}, { ...good, board: [] }), /bad board/);
+});
+
+test('easier difficulties play legal moves that score no more than the best', () => {
+  const board = createBoard();
+  place(board, 7, 7, 'across', 'CAT');
+  const rack = ['S', 'E', 'A', 'T', 'X', 'I', 'Q'];
+  const best = findBestMove(board, rack, dict)!;
+  assert.equal(chooseMove(board, rack, dict, 'hard')!.score, best.score);
+  for (const difficulty of ['easy', 'medium'] as const) {
+    for (let i = 0; i < 10; i++) {
+      const move = chooseMove(board, rack, dict, difficulty, () => i / 10)!;
+      assert.ok(evaluateMove(board, move.placements, dict).ok);
+      assert.ok(move.score <= best.score);
+    }
+  }
+  const easy = chooseMove(board, rack, dict, 'easy', () => 0)!;
+  assert.ok(easy.score < best.score, `easy scored ${easy.score}, best is ${best.score}`);
+});
+
+test('difficulty is saved, and old saves without it resume as hard', () => {
+  const game = new Game(dict, { difficulty: 'easy', rng: () => 0.4 });
+  const snapshot = JSON.parse(JSON.stringify(game.toSnapshot()));
+  assert.equal(new Game(dict, {}, snapshot).difficulty, 'easy');
+  delete snapshot.difficulty;
+  assert.equal(new Game(dict, {}, snapshot).difficulty, 'hard');
+  assert.throws(() => new Game(dict, {}, { ...snapshot, difficulty: 'impossible' }), /bad difficulty/);
 });

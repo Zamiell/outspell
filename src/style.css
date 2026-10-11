@@ -149,6 +149,12 @@ h2 {
 .score.active {
   border-color: var(--accent);
 }
+.score .label small {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.1;
+}
 .score .value {
   font-size: 1.6rem;
   font-weight: 700;
@@ -529,6 +535,47 @@ dialog h2 {
   letter-spacing: 0;
   color: var(--text);
 }
+[hidden] {
+  display: none !important;
+}
+
+.new-game-dialog {
+  width: min(360px, calc(100vw - 32px));
+}
+.new-game-dialog h2 {
+  margin-bottom: 4px;
+}
+.new-game-dialog p {
+  margin: 0 0 16px;
+}
+.difficulty-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.difficulty-options button:not(.text-button) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 14px;
+  text-align: left;
+}
+.difficulty-options button strong {
+  font-size: 1.05rem;
+}
+.difficulty-options button span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.difficulty-options button.last-used {
+  border: 2px solid var(--accent);
+}
+.difficulty-options .text-button {
+  align-self: center;
+  margin-top: 4px;
+}
+
 .blank-letters {
   display: grid;
   grid-template-columns: repeat(7, 40px);

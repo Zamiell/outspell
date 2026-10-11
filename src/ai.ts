@@ -16,6 +16,44 @@ export function findBestMove(board: Board, rack: readonly string[], dict: Dictio
   return best;
 }
 
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'medium', 'hard'];
+
+/** Easier levels aim for this fraction of the best available score. */
+const TARGET_FRACTION: Record<Exclude<Difficulty, 'hard'>, number> = { easy: 0.35, medium: 0.65 };
+
+/**
+ * Picks the AI's move for a difficulty. Hard plays the best move. Easier levels
+ * pick at random among moves scoring near a fraction of the best, so they still
+ * play real words but leave points on the table.
+ */
+export function chooseMove(
+  board: Board,
+  rack: readonly string[],
+  dict: Dictionary,
+  difficulty: Difficulty,
+  rng: () => number = Math.random,
+): ScoredMove | null {
+  if (difficulty === 'hard') return findBestMove(board, rack, dict);
+
+  const moves: ScoredMove[] = [];
+  forEachMove(board, rack, dict, (placements) => {
+    const result = evaluateMove(board, placements, dict);
+    if (result.ok) moves.push(result.move);
+  });
+  if (moves.length === 0) return null;
+
+  const best = moves.reduce((max, m) => Math.max(max, m.score), 0);
+  const target = best * TARGET_FRACTION[difficulty];
+  const tolerance = Math.max(3, target * 0.25);
+  const near = moves.filter((m) => Math.abs(m.score - target) <= tolerance);
+  const pool = near.length
+    ? near
+    : [moves.reduce((a, b) => (Math.abs(b.score - target) < Math.abs(a.score - target) ? b : a))];
+  return pool[Math.floor(rng() * pool.length)];
+}
+
 /** All candidate placements (main word guaranteed valid; cross-words pre-checked). */
 export function generateMoves(board: Board, rack: readonly string[], dict: Dictionary): Placement[][] {
   const moves: Placement[][] = [];

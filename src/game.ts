@@ -1,4 +1,4 @@
-import { findBestMove } from './ai.ts';
+import { DIFFICULTIES, type Difficulty, chooseMove } from './ai.ts';
 import { type Board, BOARD_SIZE, createBoard } from './board.ts';
 import type { Dictionary } from './dictionary.ts';
 import { type Placement, type ScoredMove, evaluateMove } from './rules.ts';
@@ -33,6 +33,8 @@ export type SavedTurn =
 /** Plain-JSON form of a game, for saving it and restoring it later. */
 export interface GameSnapshot {
   version: 1;
+  /** Missing in saves from before difficulty levels existed; those were hard. */
+  difficulty?: Difficulty;
   board: Board;
   bag: string[];
   players: { rack: string[]; score: number; rackSize: number }[];
@@ -43,6 +45,7 @@ export interface GameSnapshot {
 }
 
 export interface GameOptions {
+  difficulty?: Difficulty;
   humanRackSize?: number;
   aiRackSize?: number;
   rng?: Rng;
@@ -52,17 +55,21 @@ export class Game {
   readonly board: Board;
   readonly bag: Bag;
   readonly players: Player[];
+  readonly difficulty: Difficulty;
   current = 0;
   over = false;
   history: Turn[] = [];
   private scorelessTurns = 0;
+  private readonly rng: Rng;
 
   /** Starts a new game, or resumes `snapshot` (throws if the snapshot isn't a valid game). */
   constructor(
     readonly dict: Dictionary,
-    { humanRackSize = HUMAN_RACK_SIZE, aiRackSize = AI_RACK_SIZE, rng = Math.random }: GameOptions = {},
+    { difficulty = 'hard', humanRackSize = HUMAN_RACK_SIZE, aiRackSize = AI_RACK_SIZE, rng = Math.random }: GameOptions = {},
     snapshot?: GameSnapshot,
   ) {
+    this.rng = rng;
+    this.difficulty = snapshot?.difficulty ?? difficulty;
     this.players = [
       { name: 'You', isAI: false, rackSize: humanRackSize, rack: [], score: 0 },
       { name: 'AI', isAI: true, rackSize: aiRackSize, rack: [], score: 0 },
@@ -87,6 +94,7 @@ export class Game {
   toSnapshot(): GameSnapshot {
     return {
       version: 1,
+      difficulty: this.difficulty,
       board: this.board.map((row) => row.map((tile) => (tile ? { ...tile } : null))),
       bag: this.bag.contents,
       players: this.players.map(({ rack, score, rackSize }) => ({ rack: [...rack], score, rackSize })),
@@ -135,9 +143,9 @@ export class Game {
     return this.endTurn({ kind: 'pass', player: this.currentPlayer });
   }
 
-  /** The AI plays its highest-scoring move, or passes if it has none. */
+  /** The AI plays a move chosen for the difficulty, or passes if it has none. */
   playAI(): Turn {
-    const move = findBestMove(this.board, this.currentPlayer.rack, this.dict);
+    const move = chooseMove(this.board, this.currentPlayer.rack, this.dict, this.difficulty, this.rng);
     return move ? this.play(move.placements) : this.pass();
   }
 
@@ -182,6 +190,7 @@ function validateSnapshot(snap: GameSnapshot): void {
     throw new Error(`Invalid saved game: ${why}`);
   };
   if (snap?.version !== 1) fail('unknown version');
+  if (snap.difficulty !== undefined && !DIFFICULTIES.includes(snap.difficulty)) fail('bad difficulty');
   if (!Array.isArray(snap.board) || snap.board.length !== BOARD_SIZE || snap.board.some((r) => !Array.isArray(r) || r.length !== BOARD_SIZE)) {
     fail('bad board');
   }
