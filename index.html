@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Outspell</title>
+  </head>
+  <body>
+    <main id="app">
+      <section class="board-area">
+        <div id="board" class="board" role="grid" aria-label="Game board"></div>
+      </section>
+
+      <aside class="panel">
+        <header class="title">
+          <h1>Outspell</h1>
+          <button id="bag" class="bag-button" data-popover="bag" aria-haspopup="dialog"></button>
+        </header>
+
+        <div class="scores">
+          <div class="score" id="score-you"><span class="label">You</span><span class="value">0</span></div>
+          <div class="score" id="score-ai"><span class="label">AI</span><span class="value">0</span></div>
+        </div>
+
+        <p id="status" class="status" aria-live="polite">Loading dictionary…</p>
+
+        <div id="rack" class="rack" aria-label="Your rack"></div>
+
+        <div class="actions" id="actions">
+          <button id="play" class="primary" disabled>Play</button>
+          <button id="recall" disabled>Recall</button>
+          <button id="shuffle" disabled>Shuffle</button>
+          <button id="swap" disabled>Swap</button>
+          <button id="pass" disabled>Pass</button>
+        </div>
+
+        <h2>Moves</h2>
+        <ol id="log" class="log" reversed></ol>
+      </aside>
+    </main>
+
+    <dialog id="blank-picker">
+      <p>Choose a letter for the blank</p>
+      <div id="blank-letters" class="blank-letters"></div>
+      <form method="dialog"><button value="cancel">Cancel</button></form>
+    </dialog>
+
+    <dialog id="game-over">
+      <h2 id="game-over-title"></h2>
+      <p id="game-over-score"></p>
+      <form method="dialog"><button class="primary" value="new">New game</button></form>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

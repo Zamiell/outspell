@@ -1,0 +1,53 @@
+export const BLANK = '?';
+
+export const LETTER_VALUES: Readonly<Record<string, number>> = {
+  A: 1, B: 3, C: 3, D: 2, E: 1, F: 4, G: 2, H: 4, I: 1, J: 8, K: 5, L: 1, M: 3,
+  N: 1, O: 1, P: 3, Q: 10, R: 1, S: 1, T: 1, U: 1, V: 4, W: 4, X: 8, Y: 4, Z: 10,
+  [BLANK]: 0,
+};
+
+export const DISTRIBUTION: Readonly<Record<string, number>> = {
+  A: 9, B: 2, C: 2, D: 4, E: 12, F: 2, G: 3, H: 2, I: 9, J: 1, K: 1, L: 4, M: 2,
+  N: 6, O: 8, P: 2, Q: 1, R: 6, S: 4, T: 6, U: 4, V: 2, W: 2, X: 1, Y: 2, Z: 1,
+  [BLANK]: 2,
+};
+
+export const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+export type Rng = () => number;
+
+/** Sum of tile values, used for end-of-game rack penalties. */
+export function rackValue(rack: readonly string[]): number {
+  return rack.reduce((sum, t) => sum + LETTER_VALUES[t], 0);
+}
+
+export class Bag {
+  private tiles: string[] = [];
+
+  constructor(private readonly rng: Rng = Math.random) {
+    for (const [letter, count] of Object.entries(DISTRIBUTION)) {
+      for (let i = 0; i < count; i++) this.tiles.push(letter);
+    }
+    this.shuffle();
+  }
+
+  get size(): number {
+    return this.tiles.length;
+  }
+
+  draw(n: number): string[] {
+    return this.tiles.splice(0, Math.max(0, Math.min(n, this.tiles.length)));
+  }
+
+  putBack(tiles: readonly string[]): void {
+    this.tiles.push(...tiles);
+    this.shuffle();
+  }
+
+  private shuffle(): void {
+    for (let i = this.tiles.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [this.tiles[i], this.tiles[j]] = [this.tiles[j], this.tiles[i]];
+    }
+  }
+}
