@@ -142,28 +142,29 @@ test('corrupted saves are rejected', () => {
   assert.throws(() => new Game(dict, {}, { ...good, board: [] }), /bad board/);
 });
 
-test('easier difficulties play legal moves that score no more than the best', () => {
+test('lower levels play legal moves that score no more than the best', () => {
   const board = createBoard();
   place(board, 7, 7, 'across', 'CAT');
   const rack = ['S', 'E', 'A', 'T', 'X', 'I', 'Q'];
   const best = findBestMove(board, rack, dict)!;
-  assert.equal(chooseMove(board, rack, dict, 'hard')!.score, best.score);
-  for (const difficulty of ['easy', 'medium'] as const) {
-    for (let i = 0; i < 10; i++) {
-      const move = chooseMove(board, rack, dict, difficulty, () => i / 10)!;
+  assert.equal(chooseMove(board, rack, dict, 10)!.score, best.score);
+  for (let level = 1; level < 10; level++) {
+    for (let i = 0; i < 5; i++) {
+      const move = chooseMove(board, rack, dict, level, () => i / 5)!;
       assert.ok(evaluateMove(board, move.placements, dict).ok);
       assert.ok(move.score <= best.score);
     }
   }
-  const easy = chooseMove(board, rack, dict, 'easy', () => 0)!;
-  assert.ok(easy.score < best.score, `easy scored ${easy.score}, best is ${best.score}`);
+  const low = chooseMove(board, rack, dict, 2, () => 0)!;
+  assert.ok(low.score < best.score, `level 2 scored ${low.score}, best is ${best.score}`);
 });
 
-test('difficulty is saved, and old saves without it resume as hard', () => {
-  const game = new Game(dict, { difficulty: 'easy', rng: () => 0.4 });
+test('level is saved, and older saves get a sensible level', () => {
+  const game = new Game(dict, { level: 4, rng: () => 0.4 });
   const snapshot = JSON.parse(JSON.stringify(game.toSnapshot()));
-  assert.equal(new Game(dict, {}, snapshot).difficulty, 'easy');
-  delete snapshot.difficulty;
-  assert.equal(new Game(dict, {}, snapshot).difficulty, 'hard');
-  assert.throws(() => new Game(dict, {}, { ...snapshot, difficulty: 'impossible' }), /bad difficulty/);
+  assert.equal(new Game(dict, {}, snapshot).level, 4);
+  delete snapshot.level;
+  assert.equal(new Game(dict, {}, snapshot).level, 10);
+  assert.equal(new Game(dict, {}, { ...snapshot, difficulty: 'easy' }).level, 3);
+  assert.throws(() => new Game(dict, {}, { ...snapshot, level: 11 }), /bad level/);
 });

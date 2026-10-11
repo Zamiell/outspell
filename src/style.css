@@ -548,32 +548,35 @@ dialog h2 {
 .new-game-dialog p {
   margin: 0 0 16px;
 }
-.difficulty-options {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.level-picker {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
 }
-.difficulty-options button:not(.text-button) {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 12px 14px;
-  text-align: left;
+.level-picker button {
+  padding: 10px 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
-.difficulty-options button strong {
-  font-size: 1.05rem;
+.level-picker button[aria-checked='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
-.difficulty-options button span {
-  font-size: 0.85rem;
+.level-description {
+  min-height: 2.8em;
+  margin: 12px 0 !important;
+  font-size: 0.9rem;
   color: var(--muted);
 }
-.difficulty-options button.last-used {
-  border: 2px solid var(--accent);
+.level-description strong {
+  color: var(--text);
 }
-.difficulty-options .text-button {
-  align-self: center;
-  margin-top: 4px;
+.new-game-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .blank-letters {

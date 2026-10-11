@@ -16,26 +16,27 @@ export function findBestMove(board: Board, rack: readonly string[], dict: Dictio
   return best;
 }
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export const MIN_LEVEL = 1;
+export const MAX_LEVEL = 10;
 
-export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'medium', 'hard'];
-
-/** Easier levels aim for this fraction of the best available score. */
-const TARGET_FRACTION: Record<Exclude<Difficulty, 'hard'>, number> = { easy: 0.35, medium: 0.65 };
+export function isLevel(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= MIN_LEVEL && (value as number) <= MAX_LEVEL;
+}
 
 /**
- * Picks the AI's move for a difficulty. Hard plays the best move. Easier levels
- * pick at random among moves scoring near a fraction of the best, so they still
- * play real words but leave points on the table.
+ * Picks the AI's move for a difficulty level from 1 to 10. Level 10 plays the
+ * best move; level N aims for N×10% of the best available score, picking at
+ * random among moves near that, so it still plays real words but leaves
+ * points on the table.
  */
 export function chooseMove(
   board: Board,
   rack: readonly string[],
   dict: Dictionary,
-  difficulty: Difficulty,
+  level: number,
   rng: () => number = Math.random,
 ): ScoredMove | null {
-  if (difficulty === 'hard') return findBestMove(board, rack, dict);
+  if (level >= MAX_LEVEL) return findBestMove(board, rack, dict);
 
   const moves: ScoredMove[] = [];
   forEachMove(board, rack, dict, (placements) => {
@@ -45,7 +46,7 @@ export function chooseMove(
   if (moves.length === 0) return null;
 
   const best = moves.reduce((max, m) => Math.max(max, m.score), 0);
-  const target = best * TARGET_FRACTION[difficulty];
+  const target = (best * level) / MAX_LEVEL;
   const tolerance = Math.max(3, target * 0.25);
   const near = moves.filter((m) => Math.abs(m.score - target) <= tolerance);
   const pool = near.length

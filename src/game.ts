@@ -1,4 +1,4 @@
-import { DIFFICULTIES, type Difficulty, chooseMove } from './ai.ts';
+import { MAX_LEVEL, chooseMove, isLevel } from './ai.ts';
 import { type Board, BOARD_SIZE, createBoard } from './board.ts';
 import type { Dictionary } from './dictionary.ts';
 import { type Placement, type ScoredMove, evaluateMove } from './rules.ts';
@@ -33,8 +33,10 @@ export type SavedTurn =
 /** Plain-JSON form of a game, for saving it and restoring it later. */
 export interface GameSnapshot {
   version: 1;
-  /** Missing in saves from before difficulty levels existed; those were hard. */
-  difficulty?: Difficulty;
+  /** AI difficulty, 1–10. Missing in older saves (see `levelOf`). */
+  level?: number;
+  /** Older saves used named difficulties instead of levels. */
+  difficulty?: 'easy' | 'medium' | 'hard';
   board: Board;
   bag: string[];
   players: { rack: string[]; score: number; rackSize: number }[];
@@ -45,7 +47,8 @@ export interface GameSnapshot {
 }
 
 export interface GameOptions {
-  difficulty?: Difficulty;
+  /** AI difficulty, 1–10 (default 10: always the best move). */
+  level?: number;
   humanRackSize?: number;
   aiRackSize?: number;
   rng?: Rng;
@@ -55,7 +58,7 @@ export class Game {
   readonly board: Board;
   readonly bag: Bag;
   readonly players: Player[];
-  readonly difficulty: Difficulty;
+  readonly level: number;
   current = 0;
   over = false;
   history: Turn[] = [];
@@ -65,11 +68,11 @@ export class Game {
   /** Starts a new game, or resumes `snapshot` (throws if the snapshot isn't a valid game). */
   constructor(
     readonly dict: Dictionary,
-    { difficulty = 'hard', humanRackSize = HUMAN_RACK_SIZE, aiRackSize = AI_RACK_SIZE, rng = Math.random }: GameOptions = {},
+    { level = MAX_LEVEL, humanRackSize = HUMAN_RACK_SIZE, aiRackSize = AI_RACK_SIZE, rng = Math.random }: GameOptions = {},
     snapshot?: GameSnapshot,
   ) {
     this.rng = rng;
-    this.difficulty = snapshot?.difficulty ?? difficulty;
+    this.level = snapshot ? levelOf(snapshot) : level;
     this.players = [
       { name: 'You', isAI: false, rackSize: humanRackSize, rack: [], score: 0 },
       { name: 'AI', isAI: true, rackSize: aiRackSize, rack: [], score: 0 },
@@ -94,7 +97,7 @@ export class Game {
   toSnapshot(): GameSnapshot {
     return {
       version: 1,
-      difficulty: this.difficulty,
+      level: this.level,
       board: this.board.map((row) => row.map((tile) => (tile ? { ...tile } : null))),
       bag: this.bag.contents,
       players: this.players.map(({ rack, score, rackSize }) => ({ rack: [...rack], score, rackSize })),
@@ -143,9 +146,9 @@ export class Game {
     return this.endTurn({ kind: 'pass', player: this.currentPlayer });
   }
 
-  /** The AI plays a move chosen for the difficulty, or passes if it has none. */
+  /** The AI plays a move chosen for its level, or passes if it has none. */
   playAI(): Turn {
-    const move = chooseMove(this.board, this.currentPlayer.rack, this.dict, this.difficulty, this.rng);
+    const move = chooseMove(this.board, this.currentPlayer.rack, this.dict, this.level, this.rng);
     return move ? this.play(move.placements) : this.pass();
   }
 
@@ -184,13 +187,21 @@ export function removeTiles(rack: readonly string[], tiles: readonly string[]): 
   return remaining;
 }
 
+/** Named difficulties from older saves, mapped to the nearest (easier) level. */
+const LEGACY_LEVELS = { easy: 3, medium: 6, hard: 10 } as const;
+
+function levelOf(snap: GameSnapshot): number {
+  return snap.level ?? (snap.difficulty ? LEGACY_LEVELS[snap.difficulty] : MAX_LEVEL);
+}
+
 /** Rejects anything that isn't a coherent game: wrong shape, or tiles that don't add up to one full set. */
 function validateSnapshot(snap: GameSnapshot): void {
   const fail = (why: string): never => {
     throw new Error(`Invalid saved game: ${why}`);
   };
   if (snap?.version !== 1) fail('unknown version');
-  if (snap.difficulty !== undefined && !DIFFICULTIES.includes(snap.difficulty)) fail('bad difficulty');
+  if (snap.level !== undefined && !isLevel(snap.level)) fail('bad level');
+  if (snap.difficulty !== undefined && !(snap.difficulty in LEGACY_LEVELS)) fail('bad difficulty');
   if (!Array.isArray(snap.board) || snap.board.length !== BOARD_SIZE || snap.board.some((r) => !Array.isArray(r) || r.length !== BOARD_SIZE)) {
     fail('bad board');
   }

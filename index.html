@@ -11,7 +11,7 @@
         <h1>Outspell</h1>
         <div class="scores">
           <div class="score" id="score-you"><span class="label">You</span><span class="value">0</span></div>
-          <div class="score" id="score-ai"><span class="label">AI<small id="difficulty-label"></small></span><span class="value">0</span></div>
+          <div class="score" id="score-ai"><span class="label">AI<small id="level-label"></small></span><span class="value">0</span></div>
         </div>
         <button id="bag" class="bag-button" data-popover="bag" aria-haspopup="dialog"></button>
         <button id="zoom" class="icon-button compact-only" aria-label="Zoom board" aria-pressed="false">
@@ -59,11 +59,11 @@
     <dialog id="new-game-dialog" class="new-game-dialog">
       <h2 id="new-game-title">New game</h2>
       <p id="new-game-subtitle" class="muted"></p>
-      <form method="dialog" class="difficulty-options">
-        <button value="easy"><strong>Easy</strong><span>Plays modest words and rarely scores big</span></button>
-        <button value="medium"><strong>Medium</strong><span>Solid, but often misses its best play</span></button>
-        <button value="hard"><strong>Hard</strong><span>Always plays its highest-scoring move</span></button>
+      <div id="level-picker" class="level-picker" role="radiogroup" aria-label="AI level"></div>
+      <p id="level-description" class="level-description"></p>
+      <form method="dialog" class="new-game-actions">
         <button value="cancel" id="new-game-cancel" class="text-button">Cancel</button>
+        <button value="start" class="primary">Start game</button>
       </form>
     </dialog>
 

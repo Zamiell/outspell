@@ -1,6 +1,6 @@
 import './style.css';
 import wordsUrl from '../dictionary/enable1.txt?url';
-import { DIFFICULTIES, type Difficulty } from './ai.ts';
+import { MAX_LEVEL, MIN_LEVEL, isLevel } from './ai.ts';
 import { BOARD_SIZE, CENTER, PREMIUMS, cellLabel, inBounds } from './board.ts';
 import { define } from './definitions.ts';
 import { Dictionary } from './dictionary.ts';
@@ -40,9 +40,9 @@ interface Drag {
 const AI_DELAY_MS = 600;
 /** localStorage key for the game in progress. Bump the suffix if the snapshot format changes. */
 const SAVE_KEY = 'outspell:game:v1';
-/** localStorage key for the last difficulty picked, offered first next time. */
-const DIFFICULTY_KEY = 'outspell:difficulty';
-const DIFFICULTY_NAMES: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+/** localStorage key for the last level picked, offered first next time. */
+const LEVEL_KEY = 'outspell:level';
+const DEFAULT_LEVEL = 5;
 const ZOOM_FACTOR = 1.8;
 const DRAG_THRESHOLD_PX = 6;
 /** On touch, the dragged tile floats this far above the finger so you can see where it's going. */
@@ -305,7 +305,7 @@ function render(): void {
 
   $('score-you').querySelector('.value')!.textContent = String(human().score);
   $('score-ai').querySelector('.value')!.textContent = String(ai().score);
-  $('difficulty-label').textContent = DIFFICULTY_NAMES[game.difficulty];
+  $('level-label').textContent = `Level ${game.level}`;
   $('score-you').classList.toggle('active', !game.over && !game.currentPlayer.isAI);
   $('score-ai').classList.toggle('active', !game.over && game.currentPlayer.isAI);
   bagEl.textContent = `${game.bag.size} in bag`;
@@ -378,25 +378,53 @@ function focusPoint(): number {
 
 // ---------------------------------------------------------------- actions
 
-function chooseBlankLetter(): Promise<string | null> {
+/**
+ * Shows a modal dialog and resolves with the `value` of the button pressed, or
+ * null on Escape (when `allowEscape`). Driven by the buttons themselves rather
+ * than the dialog's `close` event, which some browsers don't fire reliably.
+ */
+function runDialog(dialog: HTMLDialogElement, { allowEscape = true } = {}): Promise<string | null> {
   return new Promise((resolve) => {
-    const container = $('blank-letters');
-    container.replaceChildren(
-      ...[...ALPHABET].map((letter) => {
-        const b = document.createElement('button');
-        b.textContent = letter;
-        b.addEventListener('click', () => blankPicker.close(letter));
-        return b;
-      }),
-    );
-    blankPicker.returnValue = '';
-    blankPicker.addEventListener(
-      'close',
-      () => resolve(ALPHABET.includes(blankPicker.returnValue) && blankPicker.returnValue ? blankPicker.returnValue : null),
-      { once: true },
-    );
-    blankPicker.showModal();
+    const finish = (value: string | null) => {
+      dialog.removeEventListener('click', onClick);
+      dialog.removeEventListener('cancel', onCancel);
+      dialog.close();
+      resolve(value);
+    };
+    const onClick = (e: MouseEvent) => {
+      const button = (e.target as Element).closest<HTMLButtonElement>('button[value]');
+      if (!button) return;
+      e.preventDefault(); // handle it here instead of letting the form submit
+      finish(button.value);
+    };
+    const onCancel = (e: Event) => {
+      e.preventDefault();
+      if (allowEscape) {
+        finish(null);
+        return;
+      }
+      // Browsers may close the dialog anyway on a repeated Escape; put it back.
+      setTimeout(() => {
+        if (!dialog.open) dialog.showModal();
+      }, 0);
+    };
+    dialog.addEventListener('click', onClick);
+    dialog.addEventListener('cancel', onCancel);
+    dialog.showModal();
   });
+}
+
+async function chooseBlankLetter(): Promise<string | null> {
+  $('blank-letters').replaceChildren(
+    ...[...ALPHABET].map((letter) => {
+      const b = document.createElement('button');
+      b.textContent = letter;
+      b.value = letter;
+      return b;
+    }),
+  );
+  const choice = await runDialog(blankPicker);
+  return choice && ALPHABET.includes(choice) ? choice : null;
 }
 
 /** Puts a rack tile on a square. Blanks ask for a letter unless `blankAs` is given. */
@@ -505,46 +533,61 @@ function showGameOver(): void {
 }
 
 /**
- * Asks for a difficulty and starts a game with it. When `cancellable`, the
+ * Asks for an AI level and starts a game with it. When `cancellable`, the
  * current game carries on if the player backs out.
  */
-async function promptNewGame({ title = 'New game', subtitle = 'How tough should the AI be?', cancellable = false } = {}): Promise<void> {
+async function promptNewGame({ title = 'New game', subtitle = 'Pick how tough the AI should be.', cancellable = false } = {}): Promise<void> {
   $('new-game-title').textContent = title;
   $('new-game-subtitle').textContent = subtitle;
   $('new-game-cancel').hidden = !cancellable;
-  const last = readStoredDifficulty();
-  for (const b of newGameDialog.querySelectorAll<HTMLButtonElement>('.difficulty-options button[value]')) {
-    b.classList.toggle('last-used', b.value === last);
+
+  // Offer the last level picked, else the current game's (e.g. a resumed older save).
+  let level = readStoredLevel() ?? (game as Game | undefined)?.level ?? DEFAULT_LEVEL;
+  const picker = $('level-picker');
+  const buttons: HTMLButtonElement[] = [];
+  const select = (n: number) => {
+    level = n;
+    buttons.forEach((b, i) => b.setAttribute('aria-checked', String(i + MIN_LEVEL === n)));
+    $('level-description').innerHTML = `<strong>Level ${n}</strong> · ${describeLevel(n)}`;
+  };
+  for (let n = MIN_LEVEL; n <= MAX_LEVEL; n++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = String(n);
+    b.setAttribute('role', 'radio');
+    b.addEventListener('click', () => select(n));
+    buttons.push(b);
   }
-  newGameDialog.returnValue = '';
-  newGameDialog.showModal();
-  newGameDialog.querySelector<HTMLButtonElement>(`button[value="${last}"]`)?.focus();
-  const choice = await new Promise<string>((resolve) =>
-    newGameDialog.addEventListener('close', () => resolve(newGameDialog.returnValue), { once: true }),
-  );
-  if (!DIFFICULTIES.includes(choice as Difficulty)) return; // cancelled
+  picker.replaceChildren(...buttons);
+  select(level);
+
+  const choice = runDialog(newGameDialog, { allowEscape: cancellable });
+  buttons[level - MIN_LEVEL].focus();
+  if ((await choice) !== 'start') return; // cancelled
   try {
-    localStorage.setItem(DIFFICULTY_KEY, choice);
+    localStorage.setItem(LEVEL_KEY, String(level));
   } catch {
     // ignore: we just won't remember it
   }
-  startGame(new Game(dict, { difficulty: choice as Difficulty }));
+  startGame(new Game(dict, { level }));
 }
 
-function readStoredDifficulty(): Difficulty {
+function describeLevel(n: number): string {
+  if (n >= MAX_LEVEL) return 'Ruthless: always plays its highest-scoring move.';
+  const feel = n <= 3 ? 'Gentle' : n <= 6 ? 'Casual' : 'Tough';
+  return `${feel}: plays moves worth about ${n * 10}% of its best.`;
+}
+
+function readStoredLevel(): number | null {
   try {
-    const stored = localStorage.getItem(DIFFICULTY_KEY) as Difficulty | null;
-    if (stored && DIFFICULTIES.includes(stored)) return stored;
+    const stored = Number(localStorage.getItem(LEVEL_KEY));
+    if (isLevel(stored)) return stored;
   } catch {
     // fall through
   }
-  return 'medium';
+  return null;
 }
 
-// Escape would close the dialog without a choice; only allow that when there's a game to go back to.
-newGameDialog.addEventListener('cancel', (e) => {
-  if ($('new-game-cancel').hidden) e.preventDefault();
-});
 
 function startGame(g: Game): void {
   game = g;
@@ -907,6 +950,7 @@ document.addEventListener('keydown', (e) => {
 Dictionary.load(wordsUrl)
   .then((loaded) => {
     dict = loaded;
+    statusEl.textContent = '';
     const saved = loadSavedGame();
     if (saved) startGame(saved);
     else void promptNewGame({ title: 'Welcome to Outspell', subtitle: 'Pick how tough the AI should be.' });
