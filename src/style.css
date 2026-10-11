@@ -345,6 +345,16 @@ h2 {
   user-select: none;
   -webkit-user-select: none;
 }
+.rack .tile.dragging {
+  display: none;
+}
+.rack-gap {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border: 2px dashed var(--accent);
+  border-radius: 4px;
+}
 .rack .tile.selected {
   transform: translateY(-5px);
   outline: 3px solid var(--accent);
@@ -611,7 +621,8 @@ dialog h2 {
     min-height: 0;
     background: none;
   }
-  .rack .tile {
+  .rack .tile,
+  .rack-gap {
     flex: 1 1 0;
     max-width: 58px;
     height: auto;

@@ -20,6 +20,7 @@ A browser Scrabble game: you against a greedy AI.
 - Tap a placed tile to take it back, or press **Recall** for all of them.
 - The status line previews the words and score as you go. Press **Play** when the move is valid.
 - **Blanks** ask which letter they should be (typing a letter you don't have uses a blank automatically).
+- **Rearrange your rack** by dragging tiles left or right along it.
 - **Swap** exchanges tiles (only while the bag has at least 7). **Shuffle** reorders your rack. **Pass** skips your turn.
 - **Tap "N in bag"** to see the unseen tiles. These are the bag plus the AI's rack combined, since you can't tell which is which.
 - **Tap any word in the move list** (or hover with a mouse) for its definition, from [Wiktionary](https://en.wiktionary.org).

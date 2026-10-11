@@ -32,6 +32,8 @@ interface Drag {
   tile: HTMLElement;
   ghost: HTMLElement | null;
   target: number | 'rack' | null;
+  /** When over the rack: where the tile would be inserted among the visible tiles. */
+  slot: number | null;
 }
 
 const AI_DELAY_MS = 600;
@@ -573,7 +575,7 @@ document.addEventListener(
 
 function startDrag(e: PointerEvent, source: DragSource, tile: HTMLElement): void {
   if (!myTurn() || swapping || e.button !== 0) return;
-  drag = { source, pointerId: e.pointerId, pointerType: e.pointerType, startX: e.clientX, startY: e.clientY, tile, ghost: null, target: null };
+  drag = { source, pointerId: e.pointerId, pointerType: e.pointerType, startX: e.clientX, startY: e.clientY, tile, ghost: null, target: null, slot: null };
   try {
     tile.setPointerCapture(e.pointerId);
   } catch {
@@ -615,14 +617,45 @@ document.addEventListener('pointermove', (e) => {
   drag.ghost.style.left = `${x}px`;
   drag.ghost.style.top = `${y}px`;
 
-  const key = cellAt(x, y);
+  // Finger on the rack means reordering. Otherwise a board square under the (lifted) tile
+  // wins, and anywhere else in the dock still counts as the rack.
+  const underFinger = document.elementFromPoint(e.clientX, e.clientY);
+  const onRack = !!underFinger?.closest('#rack');
+  const key = onRack ? null : cellAt(x, y);
+  const overDock = onRack || [document.elementFromPoint(x, y), underFinger].some((el) => el?.closest('.dock'));
   if (key !== null) {
     const own = drag.source.kind === 'cell' && drag.source.key === key;
     setDropTarget(isFree(key) || own ? key : null);
+    showRackGap(null);
+  } else if (overDock) {
+    setDropTarget('rack');
+    showRackGap(rackSlotAt(x));
   } else {
-    setDropTarget(document.elementFromPoint(x, y)?.closest('#rack, .dock') ? 'rack' : null);
+    setDropTarget(null);
+    showRackGap(null);
   }
 });
+
+/** Insertion index among the visible rack tiles for a pointer at screen x. */
+function rackSlotAt(x: number): number {
+  const tiles = [...rackEl.querySelectorAll<HTMLElement>('.tile:not(.dragging)')];
+  return tiles.filter((t) => {
+    const r = t.getBoundingClientRect();
+    return r.left + r.width / 2 < x;
+  }).length;
+}
+
+/** Opens a gap in the rack where the dragged tile would land. */
+function showRackGap(slot: number | null): void {
+  if (!drag || drag.slot === slot) return;
+  drag.slot = slot;
+  rackEl.querySelector('.rack-gap')?.remove();
+  if (slot === null) return;
+  const gap = document.createElement('div');
+  gap.className = 'rack-gap';
+  const tiles = rackEl.querySelectorAll('.tile:not(.dragging)');
+  rackEl.insertBefore(gap, tiles[slot] ?? null);
+}
 
 /** The board square at a screen point, by geometry so the gaps between squares still count. */
 function cellAt(x: number, y: number): number | null {
@@ -636,9 +669,10 @@ function cellAt(x: number, y: number): number | null {
 
 function endDrag(drop: boolean): void {
   if (!drag) return;
-  const { source, target, ghost } = drag;
+  const { source, target, ghost, slot } = drag;
   ghost?.remove();
   drag.tile.classList.remove('dragging');
+  showRackGap(null);
   setDropTarget(null);
   drag = null;
   if (!ghost) return; // never moved far enough: it was a tap, handled by click
@@ -656,9 +690,37 @@ function endDrag(drop: boolean): void {
     });
     return;
   }
-  if (source.kind === 'cell' && typeof target === 'number') moveWithinBoard(source.key, target);
-  else if (source.kind === 'cell' && target === 'rack') pending.delete(source.key);
+  if (source.kind === 'cell' && typeof target === 'number') {
+    moveWithinBoard(source.key, target);
+  } else if (target === 'rack') {
+    let index: number;
+    if (source.kind === 'cell') {
+      index = pending.get(source.key)!.rackIndex;
+      pending.delete(source.key);
+    } else {
+      index = source.index;
+    }
+    if (slot !== null) moveInRack(index, slot);
+  }
   render();
+}
+
+/** Moves one rack tile to `slot` among the visible tiles (tiles on the board stay hidden at the end). */
+function moveInRack(index: number, slot: number): void {
+  const used = usedRackIndices();
+  const visible = human().rack.map((_, i) => i).filter((i) => i !== index && !used.has(i));
+  visible.splice(slot, 0, index);
+  applyRackOrder([...visible, ...used]);
+}
+
+/** Reorders the rack (`order` lists old indices in their new order), keeping placed tiles and selections pointing at the right tiles. */
+function applyRackOrder(order: number[]): void {
+  const rack = human().rack;
+  const newIndex = new Map(order.map((oldIndex, i) => [oldIndex, i]));
+  human().rack = order.map((i) => rack[i]);
+  for (const p of pending.values()) p.rackIndex = newIndex.get(p.rackIndex)!;
+  if (selected !== null) selected = newIndex.get(selected)!;
+  if (swapping) swapping = new Set([...swapping].map((i) => newIndex.get(i)!));
 }
 
 document.addEventListener('pointerup', (e) => {
@@ -687,15 +749,12 @@ buttons.recall.addEventListener('click', () => {
 
 buttons.shuffle.addEventListener('click', () => {
   // Shuffle the rack in place, keeping any tiles already on the board where they are.
-  const rack = human().rack;
-  const order = rack.map((_, i) => i);
+  const order = human().rack.map((_, i) => i);
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [order[i], order[j]] = [order[j], order[i]];
   }
-  const newIndex = new Map(order.map((oldIndex, i) => [oldIndex, i]));
-  human().rack = order.map((i) => rack[i]);
-  for (const p of pending.values()) p.rackIndex = newIndex.get(p.rackIndex)!;
+  applyRackOrder(order);
   selected = null;
   render();
 });
