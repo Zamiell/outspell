@@ -52,3 +52,7 @@ Every push to `main` runs the tests, builds the site and publishes it to GitHub 
 | `src/main.ts`, `src/style.css`, `index.html` | Browser UI |
 | `dictionary/enable1.txt` | The ENABLE word list |
 | `test/` | Unit tests |
+
+## License
+
+[MIT](LICENSE). The ENABLE word list in `dictionary/` is public domain.
