@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { chooseMove, findBestMove } from '../src/ai.ts';
 import { type Board, BOARD_SIZE, createBoard } from '../src/board.ts';
@@ -167,4 +168,20 @@ test('level is saved, and older saves get a sensible level', () => {
   assert.equal(new Game(dict, {}, snapshot).level, 10);
   assert.equal(new Game(dict, {}, { ...snapshot, difficulty: 'easy' }).level, 3);
   assert.throws(() => new Game(dict, {}, { ...snapshot, level: 11 }), /bad level/);
+});
+
+test('the additions list is well-formed and only adds words ENABLE lacks', () => {
+  const read = (path: string) =>
+    readFileSync(new URL(path, import.meta.url), 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'));
+  const enable = new Set(read('../dictionary/enable1.txt'));
+  const additions = read('../dictionary/additions.txt');
+  for (const word of additions) {
+    assert.match(word, /^[a-z]{2,15}$/, `"${word}" should be 2-15 lowercase letters`);
+    assert.ok(!enable.has(word), `"${word}" is already in ENABLE`);
+  }
+  assert.equal(new Set(additions).size, additions.length, 'no duplicates');
+  assert.ok(new Dictionary(additions).has('QI'));
 });

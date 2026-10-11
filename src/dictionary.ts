@@ -27,11 +27,16 @@ export class Dictionary {
     }
   }
 
-  /** Fetches a newline-separated word list (e.g. dictionary/enable1.txt). */
-  static async load(url: string): Promise<Dictionary> {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Couldn't load the dictionary (${response.status}).`);
-    return new Dictionary((await response.text()).split('\n'));
+  /** Fetches newline-separated word lists and combines them into one dictionary. */
+  static async load(...urls: string[]): Promise<Dictionary> {
+    const texts = await Promise.all(
+      urls.map(async (url) => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Couldn't load the dictionary (${response.status}).`);
+        return response.text();
+      }),
+    );
+    return new Dictionary(texts.flatMap((text) => text.split('\n')));
   }
 
   get size(): number {

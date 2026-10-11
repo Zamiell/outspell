@@ -1,5 +1,6 @@
 import './style.css';
-import wordsUrl from '../dictionary/enable1.txt?url';
+import additionsUrl from '../dictionary/additions.txt?url';
+import enableUrl from '../dictionary/enable1.txt?url';
 import { MAX_LEVEL, MIN_LEVEL, isLevel } from './ai.ts';
 import { BOARD_SIZE, CENTER, PREMIUMS, cellLabel, inBounds } from './board.ts';
 import { define } from './definitions.ts';
@@ -947,7 +948,7 @@ document.addEventListener('keydown', (e) => {
 
 // ---------------------------------------------------------------- start
 
-Dictionary.load(wordsUrl)
+Dictionary.load(enableUrl, additionsUrl)
   .then((loaded) => {
     dict = loaded;
     statusEl.textContent = '';

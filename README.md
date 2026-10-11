@@ -9,7 +9,7 @@ A browser Scrabble game: you against a greedy AI.
 - Standard 15×15 board, tile distribution and letter values.
 - **You get 6 tiles; the AI gets the standard 7.** The 50-point bingo needs all 7 tiles in one play, so only the AI can get it.
 - **Pick the AI's level, 1 to 10,** at the start of each game. Level 10 always plays its highest-scoring move; level N plays a move worth about N×10% of its best (picked at random among moves near that score). No level looks ahead, thinks about the tiles it keeps, or plays defence. If the AI has no move, it passes.
-- Words are checked against **ENABLE** (public domain, 172,823 words). It predates some newer words, so QI and ZA aren't valid.
+- Words are checked against **ENABLE** (public domain, 172,823 words) plus a small supplement of newer words from the official North American list that ENABLE predates, like QI, ZA, OK, EW, ZEN and SELFIE (`dictionary/additions.txt`). The supplement covers only well-documented additions, so the game is close to, but not the same as, tournament play.
 - The game ends when someone plays out with the bag empty, or after six scoreless turns in a row. Leftover tiles are scored as in standard Scrabble.
 
 ## How to play
@@ -39,7 +39,7 @@ npm run typecheck
 npm run build      # static site in dist/
 ```
 
-The rack sizes are `HUMAN_RACK_SIZE` and `AI_RACK_SIZE` in `src/game.ts`. To use a different word list, replace `dictionary/enable1.txt` with any file of one word per line.
+The rack sizes are `HUMAN_RACK_SIZE` and `AI_RACK_SIZE` in `src/game.ts`. The word lists are `dictionary/enable1.txt` and `dictionary/additions.txt` (one word per line; `#` lines are comments). To allow another word, add it to `additions.txt`; a test checks the file is well-formed and doesn't repeat ENABLE.
 
 ## Deployment
 
@@ -59,6 +59,7 @@ Every push to `main` runs the tests, builds the site and publishes it to GitHub 
 | `src/popover.ts` | Tap-or-hover popovers |
 | `src/main.ts`, `src/style.css`, `index.html` | Browser UI |
 | `dictionary/enable1.txt` | The ENABLE word list |
+| `dictionary/additions.txt` | Newer official words missing from ENABLE |
 | `test/` | Unit tests |
 
 ## License
